@@ -1,12 +1,104 @@
 import sys
 import os
 import subprocess as sp
+import random as rand
 
 def usage():
-    print("generateApp.py <app_Folder_Name>\n")
+    print("generateApp.py <app_Folder_Name> ...\n")
     sys.exit(1)
 
-def initApp(appName):
+#generate a list of random permissions an app will need to request
+def randomizePermissions():
+    appPermissions = {
+        "normal"        :   [],
+        "signature"     :   [],
+        "dangerous"     :   []}
+
+    normalPermissions = [
+        "ACCESS_LOCATION_EXTRA_COMMANDS",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_NOTIFICATION_POLICY",
+        "ACCESS_WIFI_STATE",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_STICKY",
+        "CHANGE_NETWORK_STATE",
+        "CHANGE_WIFI_MULTICAST_STATE",
+        "CHANGE_WIFI_STATE",
+        "DISABLE_KEYGUARD",
+        "EXPAND_STATUS_BAR",
+        "FOREGROUND_SERVICE",
+        "GET_PACKAGE_SIZE",
+        "INSTALL_SHORTCUT",
+        "INTERNET",
+        "KILL_BACKGROUND_PROCESSES",
+        "MANAGE_OWN_CALLS",
+        "MODIFY_AUDIO_SETTINGS",
+        "NFC",
+        "READ_SYNC_SETTINGS",
+        "READ_SYNC_STATS",
+        "RECEIVE_BOOT_COMPLETED",
+        "REORDER_TASKS",
+        "REQUEST_COMPANION_RUN_BACKGROUND",
+        "REQUEST_COMPANION_USE_DATA_IN_BACKGROUND",
+        "REQUEST_DELETE_PACKAGES",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "SET_ALARM",
+        "SET_WALLPAPER",
+        "SET_WALLPAPER_HINTS",
+        "TRANSMIT_IR",
+        "USE_FINGERPRINT",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "WRITE_SYNC_SETTINGS"]
+
+    dangerPermissions = {
+        "CALENDAR"      :   ["READ_CALENDAR", "WRITE_CALENDAR"],
+        "CALL_LOG"      :   ["READ_CALL_LOG", "WRITE_CALL_LOG", "PROCESS_OUTGOING_CALLS"],
+        "CAMERA"        :   ["CAMERA"],
+        "CONTACTS"      :   ["READ_CONTACTS", "WRITE_CONTACTS", "GET_ACCOUNTS"],
+        "LOCATION"      :   ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+        "MICROPHONE"    :   ["RECORD_AUDIO"],
+        "PHONE"         :   ["READ_PHONE_STATE", "READ_PHONE_NUMBERS", "CALL_PHONE", "ANSWER_PHONE_CALLS", "ADD_VOICEMAIL", "USE_SIP"],
+        "SENSORS"       :   ["BODY_SENSORS"],
+        "SMS"           :   ["SEND_SMS", "RECEIVE_SMS", "READ_SMS", "RECEIVE_WAP_PUSH", "RECEIVE_MMS"],
+        "STORAGE"       :   ["READ_EXTERNAL_STORAGE", "READ_INTERNAL_STORAGE"]}
+
+
+    normalPermissionCount = rand.randrange(len(normalPermissions))
+    for _ in range(normalPermissionCount):
+        appPermissions['normal'].append(rand.choice(normalPermissions))
+
+
+    #TODO
+    #implement ability to have multiple dangerous permissions for each app for 
+    #interesting cross permission functionality
+    #dangerPermissionCount = rand.randrange(len(dangerPermissions))
+    dangerPermissionCount = 1
+    for _ in range(dangerPermissionCount):
+        pGroup = rand.choice(list( dangerPermissions ))
+        perm = rand.choice(dangerPermissions[pGroup])
+        appPermissions['dangerous'].append(perm)
+    
+    #remove dups
+    appPermissions['normal'] = list(set(appPermissions['normal']))
+    appPermissions['dangerous'] = list(set(appPermissions['dangerous']))
+    
+    return appPermissions    
+
+
+def manifestPermissionStrings(permissionsList):
+    permissions = ""
+
+    for perm in permissionsList['normal']:
+        permissions += f"<uses-permission android:name=\"android.permission.{perm}\"/>\n\t"
+
+    for perm in permissionsList['dangerous']:
+        permissions += f"<uses-permission android:name=\"android.permission.{perm}\"/>\n\t"
+    return permissions
+
+
+def initApp(appName, appPermissions):
     print("\033[1;31;40m ##################################")
     print("\033[1;31;40m ######## Initializing App ########")
     print("\033[1;31;40m ##################################")
@@ -84,24 +176,29 @@ dependencies {\n\
 </resources>")
         f.close()
 
+    #APP MANIFEST
+    #changed label from Demo App to name of application
+    #added permissionsStr depending on which permissions are going to be required.
+    #TODO change package name to involve appName
     with open("./app/src/main/AndroidManifest.xml", "a+") as f:
-        f.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
-<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n\
-    \tpackage=\"com.example.karl.myapplication\">\n\
-\n\
-    \t<application\n\
-        \t\tandroid:label=\"Demo App\"\n\
-        \t\tandroid:theme=\"@style/AppTheme\">\n\
-\n\
-        \t\t<activity android:name=\".MainActivity\">\n\
-            \t\t\t<intent-filter>\n\
-                \t\t\t\t\t<action android:name=\"android.intent.action.MAIN\" />\n\
-                \t\t\t\t\t<category android:name=\"android.intent.category.LAUNCHER\" />\n\
-            \t\t\t</intent-filter>\n\
-        \t\t</activity>\n\
-    \t</application>\n\
-\n\
-</manifest>\n")
+        f.write(f"""<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"
+    package=\"com.example.karl.myapplication\">
+
+    {manifestPermissionStrings(appPermissions)}
+    <application
+        android:label=\"{appName}\"
+        android:theme=\"@style/AppTheme\">
+
+        <activity android:name=\".MainActivity\">
+            <intent-filter>
+                <action android:name=\"android.intent.action.MAIN\" />
+                <category android:name=\"android.intent.category.LAUNCHER\" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>""")
         f.close()
 
         #Java Main Activity File
@@ -166,9 +263,15 @@ def getAppList(args):
         appList.append(args[i])
     return appList
 
+
+
+def genDocumentation(appNames, appSettings):
+    return None
+
+
 def main():
     if len(sys.argv) < 2:
-        print("No destination name given")
+        print("No destination names given")
         usage()
     #print(sys.argv[1])
     appList = getAppList(sys.argv)
@@ -178,7 +281,8 @@ def main():
     #in applcations folder
     os.chdir("applications")
     for app in appList:
-        initApp(app)
+        appPermissions = randomizePermissions()
+        initApp(app, appPermissions)
         buildApp(app)
 
     sys.exit(0)
